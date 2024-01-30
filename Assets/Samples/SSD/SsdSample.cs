@@ -1,6 +1,7 @@
 ﻿using TensorFlowLite;
 using UnityEngine;
 using UnityEngine.UI;
+using easyar;
 
 [RequireComponent(typeof(WebCamInput))]
 public class SsdSample : MonoBehaviour
@@ -23,6 +24,8 @@ public class SsdSample : MonoBehaviour
     private SSD ssd;
     private Text[] frames;
     private string[] labels;
+    public ARSession Session;
+    public RenderTexture renderTexture;
 
     private void Start()
     {
@@ -58,13 +61,32 @@ public class SsdSample : MonoBehaviour
         // Labels
         labels = labelMap.text.Split('\n');
 
-        GetComponent<WebCamInput>().OnTextureUpdate.AddListener(Invoke);
+        // GetComponent<WebCamInput>().OnTextureUpdate.AddListener(Invoke);
+
+        Session.StateChanged += (state) =>
+        {
+            if (state == ARSession.SessionState.Ready)
+            {
+
+                var renderer = Session.Assembly.FrameSource.GetComponent<CameraImageRenderer>();
+                renderer.RequestTargetTexture((camera, texture) =>
+                {
+                    renderTexture = texture;
+                });
+            }
+        };
     }
 
     private void OnDestroy()
     {
-        GetComponent<WebCamInput>().OnTextureUpdate.RemoveListener(Invoke);
+        //   GetComponent<WebCamInput>().OnTextureUpdate.RemoveListener(Invoke);
         ssd?.Dispose();
+    }
+
+    void Update()
+    {
+        if (renderTexture != null)
+            Invoke(renderTexture);
     }
 
     private void Invoke(Texture texture)

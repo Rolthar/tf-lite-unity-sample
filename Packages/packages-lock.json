@@ -7,6 +7,14 @@
       "dependencies": {},
       "hash": "b992a061fbf68ff1eb475d0837065b0549ed31ba"
     },
+    "com.easyar.sense": {
+      "version": "file:C:/Users/domin/Downloads/com.easyar.sense-4.6.3+3029.cb846598.tgz",
+      "depth": 0,
+      "source": "local-tarball",
+      "dependencies": {
+        "com.unity.ugui": "1.0.0"
+      }
+    },
     "com.github.asus4.mediapipe": {
       "version": "file:com.github.asus4.mediapipe",
       "depth": 0,
@@ -44,7 +52,7 @@
       "dependencies": {}
     },
     "com.unity.burst": {
-      "version": "1.8.9",
+      "version": "1.8.10",
       "depth": 1,
       "source": "registry",
       "dependencies": {
@@ -94,7 +102,16 @@
         "com.unity.mathematics": "1.2.1",
         "com.unity.burst": "1.8.9",
         "com.unity.render-pipelines.core": "14.0.9",
-        "com.unity.shadergraph": "14.0.9"
+        "com.unity.shadergraph": "14.0.9",
+        "com.unity.render-pipelines.universal-config": "14.0.9"
+      }
+    },
+    "com.unity.render-pipelines.universal-config": {
+      "version": "14.0.9",
+      "depth": 1,
+      "source": "builtin",
+      "dependencies": {
+        "com.unity.render-pipelines.core": "14.0.9"
       }
     },
     "com.unity.searcher": {
@@ -179,6 +196,12 @@
       "dependencies": {}
     },
     "com.unity.modules.jsonserialize": {
+      "version": "1.0.0",
+      "depth": 0,
+      "source": "builtin",
+      "dependencies": {}
+    },
+    "com.unity.modules.particlesystem": {
       "version": "1.0.0",
       "depth": 0,
       "source": "builtin",
