@@ -23,7 +23,6 @@ namespace SpatialMap_Dense_BallGame
         public GameObject Ball;
         public int MaxBallCount = 30;
         public float BallLifetime = 15;
-        public Button BackButton;
 
         private Color meshColor;
         private DenseSpatialMapBuilderFrameFilter dense;
@@ -34,16 +33,7 @@ namespace SpatialMap_Dense_BallGame
         {
             dense = Session.GetComponentInChildren<DenseSpatialMapBuilderFrameFilter>();
 
-            var launcher = "AllSamplesLauncher";
-            if (Application.CanStreamedLevelBeLoaded(launcher))
-            {
-                var button = BackButton.GetComponent<Button>();
-                button.onClick.AddListener(() => { UnityEngine.SceneManagement.SceneManager.LoadScene(launcher); });
-            }
-            else
-            {
-                BackButton.gameObject.SetActive(false);
-            }
+
 
 #if UNITY_ANDROID && !UNITY_EDITOR
             if (Application.platform == RuntimePlatform.Android)

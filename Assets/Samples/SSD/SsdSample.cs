@@ -2,6 +2,8 @@
 using UnityEngine;
 using UnityEngine.UI;
 using easyar;
+using TMPro;
+
 
 public class SsdSample : MonoBehaviour
 {
@@ -25,7 +27,7 @@ public class SsdSample : MonoBehaviour
     private string[] labels;
     public ARSession Session;
     public RenderTexture renderTexture;
-
+    public TMP_Text classesDisplayText;
     private void Start()
     {
 #if UNITY_ANDROID && !UNITY_EDITOR
@@ -60,8 +62,6 @@ public class SsdSample : MonoBehaviour
         // Labels
         labels = labelMap.text.Split('\n');
 
-        // GetComponent<WebCamInput>().OnTextureUpdate.AddListener(Invoke);
-
         Session.StateChanged += (state) =>
         {
             if (state == ARSession.SessionState.Ready)
@@ -78,7 +78,6 @@ public class SsdSample : MonoBehaviour
 
     private void OnDestroy()
     {
-        //   GetComponent<WebCamInput>().OnTextureUpdate.RemoveListener(Invoke);
         ssd?.Dispose();
     }
 
@@ -91,20 +90,22 @@ public class SsdSample : MonoBehaviour
     private void Invoke(Texture texture)
     {
         ssd.Invoke(texture);
-
+        classesDisplayText.text = "";
         SSD.Result[] results = ssd.GetResults();
         Vector2 size = (frameContainer.transform as RectTransform).rect.size;
         for (int i = 0; i < 10; i++)
         {
-            SetFrame(frames[i], results[i], size);
+            SetFrame(frames[i], results[i], size, out string objectText);
+            classesDisplayText.text += objectText;
         }
     }
 
-    private void SetFrame(Text frame, SSD.Result result, Vector2 size)
+    private void SetFrame(Text frame, SSD.Result result, Vector2 size, out string text)
     {
         if (result.score < scoreThreshold)
         {
             frame.gameObject.SetActive(false);
+            text = "";
             return;
         }
         else
@@ -113,6 +114,7 @@ public class SsdSample : MonoBehaviour
         }
 
         frame.text = $"{GetLabelName(result.classID)} : {(int)(result.score * 100)}%";
+        text = frame.text;
         var rt = frame.transform as RectTransform;
         rt.anchoredPosition = result.rect.position * size - size * 0.5f;
         rt.sizeDelta = result.rect.size * size;
