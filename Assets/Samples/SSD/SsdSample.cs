@@ -96,7 +96,7 @@ public class SsdSample : MonoBehaviour
         for (int i = 0; i < 10; i++)
         {
             SetFrame(frames[i], results[i], size, out string objectText);
-            classesDisplayText.text += objectText;
+            classesDisplayText.text = classesDisplayText.text + " " + objectText;
         }
     }
 
@@ -114,7 +114,7 @@ public class SsdSample : MonoBehaviour
         }
 
         frame.text = $"{GetLabelName(result.classID)} : {(int)(result.score * 100)}%";
-        text = frame.text;
+        text = $"[{GetLabelName(result.classID)} : {(int)(result.score * 100)}]";
         var rt = frame.transform as RectTransform;
         rt.anchoredPosition = result.rect.position * size - size * 0.5f;
         rt.sizeDelta = result.rect.size * size;
