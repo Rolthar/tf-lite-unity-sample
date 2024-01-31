@@ -6,6 +6,9 @@ EditorBuildSettings:
   serializedVersion: 2
   m_Scenes:
   - enabled: 1
+    path: Assets/ParticleFilter/EasyAR_ParticleFilter.unity
+    guid: 79864bf22462fc546be03e50d43df15c
+  - enabled: 1
     path: Assets/Samples/SSD_EasyAR/SSD_EasyAR.unity
     guid: 21f81ff6a0149df498166adf9d4380de
   - enabled: 1

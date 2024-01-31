@@ -3,7 +3,6 @@ using UnityEngine;
 using UnityEngine.UI;
 using easyar;
 
-[RequireComponent(typeof(WebCamInput))]
 public class SsdSample : MonoBehaviour
 {
     [SerializeField]
