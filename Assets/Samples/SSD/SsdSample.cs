@@ -3,6 +3,8 @@ using UnityEngine;
 using UnityEngine.UI;
 using easyar;
 using TMPro;
+using System.Collections.Generic;
+using ZebrarWayfinding;
 
 
 public class SsdSample : MonoBehaviour
@@ -28,8 +30,15 @@ public class SsdSample : MonoBehaviour
     public ARSession Session;
     public RenderTexture renderTexture;
     public TMP_Text classesDisplayText;
+
+    public List<SemanticItemType> semanticHistory = new();
     private void Start()
     {
+
+#if UNITY_EDITOR
+        gameObject.SetActive(false);
+#endif
+
 #if UNITY_ANDROID && !UNITY_EDITOR
         // This is an example usage of the NNAPI delegate.
         if (options.accelerator == SSD.Accelerator.NNAPI && !Application.isEditor)
@@ -112,12 +121,19 @@ public class SsdSample : MonoBehaviour
         {
             frame.gameObject.SetActive(true);
         }
+        string labelType = GetLabelName(result.classID);
+        SemanticItemType? itemEnum = GetEnumFromString(labelType);
 
-        frame.text = $"{GetLabelName(result.classID)} : {(int)(result.score * 100)}%";
-        text = $"[{GetLabelName(result.classID)} : {(int)(result.score * 100)}]";
+        frame.text = $"{labelType} : {(int)(result.score * 100)}%";
+        text = $"[{labelType} : {(int)(result.score * 100)}]";
         var rt = frame.transform as RectTransform;
         rt.anchoredPosition = result.rect.position * size - size * 0.5f;
         rt.sizeDelta = result.rect.size * size;
+
+        if(itemEnum != null)
+        {
+            
+        }
     }
 
     private string GetLabelName(int id)
@@ -127,6 +143,20 @@ public class SsdSample : MonoBehaviour
             return "?";
         }
         return labels[id + 1];
+    }
+
+
+    public SemanticItemType? GetEnumFromString(string labelType)
+    {
+        SemanticItemType result;
+        if (System.Enum.TryParse(labelType, true, out result))
+        {
+            return result;
+        }
+        else
+        {
+            return null;
+        }
     }
 
 }

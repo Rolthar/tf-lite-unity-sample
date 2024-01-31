@@ -3,10 +3,12 @@ using System.Collections.Generic;
 using System.Linq;
 using UnityEngine;
 using TMPro;
+using ZebrarWayfinding;
 
 public class FilterTwin : MonoBehaviour
 {
     public static FilterTwin Instance;
+    public static List<SemanticItem> SemanticItems = new();
 
     public GameObject particlePrefab;
     public GameObject particlePrefabGen2;
@@ -20,6 +22,7 @@ public class FilterTwin : MonoBehaviour
     public List<Bounds> levelsBounds = new();
 
     public List<Area> Areas = new();
+    public List<Area> PotentialUserAreas = new();
 
     public TMP_Text title;
     public MeshRenderer mesh;
@@ -35,6 +38,7 @@ public class FilterTwin : MonoBehaviour
     void Awake()
     {
         Instance = this;
+        SemanticItems = new();
     }
 
     void Start()
@@ -65,8 +69,99 @@ public class FilterTwin : MonoBehaviour
         if (probabilityThreshold - Time.deltaTime > 0.3)
             probabilityThreshold -= Time.deltaTime;
 
+        // foreach (SemanticItem item in SemanticItems)
+        //     Debug.Log(item.name);
+
     }
 
+    public void UpdatePotentialAreas(List<SemanticItem> cameraItems)
+    {
+        if (cameraItems.Count > 0)
+        {
+            var potentialAreas = GetMatchingAreas(Areas, cameraItems);
+            PotentialUserAreas = potentialAreas;
+            string debugString = "Potential Areas from semantics: {";
+            foreach (Area _area in potentialAreas)
+            {
+                debugString += _area.Name;
+            }
+            debugString += "}";
+            Debug.Log(debugString);
+        }
+    }
+
+
+    public List<Area> GetMatchingAreas(List<Area> areas, List<SemanticItem> cameraSemanticItems)
+    {
+        // Count the occurrences of each SemanticItemType seen by the camera
+        var cameraItemCounts = cameraSemanticItems.GroupBy(item => item.type)
+            .ToDictionary(group => group.Key, group => group.Count());
+
+        var matchingAreas = new List<Area>();
+
+        foreach (var area in areas)
+        {
+            var areaItemCounts = area.SemanticsInArea.GroupBy(item => item.type)
+                .ToDictionary(group => group.Key, group => group.Count());
+
+            // This flag indicates if the current area matches the camera's view
+            bool isMatch = cameraItemCounts.All(cameraItem =>
+                areaItemCounts.TryGetValue(cameraItem.Key, out var countInArea) && countInArea >= cameraItem.Value);
+
+            if (isMatch)
+            {
+                matchingAreas.Add(area);
+            }
+        }
+
+        return matchingAreas;
+    }
+
+    // public static List<Area> GetMatchingAreas(List<Area> areas, List<SemanticItem> cameraSemanticItems)
+    // {
+    //     // Extract the distinct types of SemanticItems seen by the camera
+    //     var cameraItemTypes = new HashSet<SemanticItemType>(cameraSemanticItems.Select(item => item.type));
+
+    //     var matchingAreas = new List<Area>();
+
+    //     foreach (var area in areas)
+    //     {
+    //         // Create a set of item types present in the area
+    //         var areaItemTypes = new HashSet<SemanticItemType>(area.SemanticsInArea.Select(item => item.type));
+
+    //         // Check if all item types seen by the camera are present in the area
+    //         if (!cameraItemTypes.Except(areaItemTypes).Any())
+    //         {
+    //             matchingAreas.Add(area);
+    //         }
+    //     }
+
+    //     return matchingAreas;
+    // }
+
+
+    public static List<Area> GetAreasContainingAllCameraItems(List<Area> areas, List<SemanticItem> cameraSemanticItems)
+    {
+        // Convert the list of SemanticItems seen by the camera into a list of their types
+        var cameraItemTypes = new HashSet<SemanticItemType>(cameraSemanticItems.Select(item => item.type));
+
+        // Find areas that contain all the semantic item types seen by the camera
+        var matchingAreas = new List<Area>();
+
+        foreach (var area in areas)
+        {
+            // Get the types of SemanticItems in the current area
+            var areaItemTypes = new HashSet<SemanticItemType>(area.SemanticsInArea.Select(item => item.type));
+
+            // Check if this area contains all types of items seen by the camera
+            if (cameraItemTypes.All(type => areaItemTypes.Contains(type)))
+            {
+                matchingAreas.Add(area);
+            }
+        }
+
+        return matchingAreas;
+    }
 
 
     public void CompareParticles()

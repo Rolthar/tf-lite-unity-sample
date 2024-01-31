@@ -15,11 +15,23 @@ public class CameraScript : MonoBehaviour
     public Vector3 PositionDelta { get; private set; }
     public Quaternion RotationDelta { get; private set; }
 
+    public Conecast SemanticCast;
+
     void Awake()
     {
         Instance = this;
         lastPosition = transform.position;
         lastRotation = transform.rotation;
+    }
+
+    void Start()
+    {
+        SemanticCast.OnSemanticListUpdate.AddListener(UpdateFilterTwinWithAreas);
+    }
+
+    public void UpdateFilterTwinWithAreas(List<SemanticItem> items)
+    {
+        FilterTwin.Instance.UpdatePotentialAreas(items);
     }
 
     void Update()

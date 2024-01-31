@@ -7,6 +7,8 @@ public class Area : MonoBehaviour
     public string Name;
     public Level level;
     public MeshRenderer rend;
+
+    public List<SemanticItem> SemanticsInArea;
     void Awake()
     {
         rend = gameObject.GetComponent<MeshRenderer>();
