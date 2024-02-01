@@ -174,36 +174,7 @@ public class FilterTwin : MonoBehaviour
         {
             particlesToRemove.Add(particles[i]);
         }
-        // foreach (var particle in particles)
-        // {
-        //     ParticleScript particleScript = particle.GetComponentInChildren<ParticleScript>();
 
-        //     if (particleScript != null)
-        //     {
-        //         if (particleScript.totalDifference > probabilityThreshold)
-        //             particlesToRemove.Add(particle);
-
-        //         // bool shouldRemove = false;
-        //         // foreach (var cameraHit in CameraScript.Instance.lastHits)
-        //         // {
-        //         //     string key = cameraHit.Key;
-        //         //     float? cameraHitValue = cameraHit.Value;
-        //         //     float? particleHitValue = particleScript.lastHits.ContainsKey(key) ? particleScript.lastHits[key] : null;
-
-        //         //     if (particleHitValue.HasValue && cameraHitValue.HasValue &&
-        //         //         Mathf.Abs(particleHitValue.Value - cameraHitValue.Value) > compareThreshold)
-        //         //     {
-        //         //         shouldRemove = true;
-        //         //         break;
-        //         //     }
-        //         // }
-
-        //         // if (shouldRemove)
-        //         // {
-        //         //     particlesToRemove.Add(particle);
-        //         // }
-        //     }
-        // }
 
         // Remove the particles after the iteration
         var removeCount = particlesToRemove.Count;
@@ -212,23 +183,6 @@ public class FilterTwin : MonoBehaviour
             particles.Remove(particle);
             Destroy(particle.transform.parent.gameObject);
         }
-
-        // if (particles.Count == 0 || smallestDiff > 5)
-        // {
-        //     particlesToRemove = new List<ParticleScript>(particles);
-        //     foreach (var particle in particlesToRemove)
-        //     {
-        //         particles.Remove(particle);
-        //         Destroy(particle.transform.parent.gameObject);
-        //     }
-        //     SpawnParticles();
-        // }
-        // else if (particles.Count <= particleSpawnCount)
-        // {     // Example usage in CompareParticles, after culling
-
-        //     SpawnNewParticles(Mathf.RoundToInt((float)particleSpawnCount / (float)particles.Count), smallestDiff);
-        // }
-
         title.text = GetAreaAndLevelName(particles[0].gameObject);
 
         var best5 = new List<ParticleScript>(particles.Take(5).ToList());
@@ -324,27 +278,33 @@ public class FilterTwin : MonoBehaviour
         return radius;
     }
 
-    void InstantiateAndAddParticle(Vector3 position)
-    {
-        // Quaternion randomRotation = Quaternion.Euler(Random.Range(0, 360), Random.Range(0, 360), Random.Range(0, 360));
-        var particle = Instantiate(particlePrefab);
-        var script = particle.GetComponentInChildren<ParticleScript>();
-        script.transform.localPosition = position;
-        script.transform.localRotation = Camera.main.transform.rotation;
-        particles.Add(script);
-    }
 
     [ContextMenu("SpawnParticles")]
     public void SpawnParticles()
     {
-        int spawnPerLevel = particleSpawnCount / levels.Count;
-        foreach (var level in levels)
+        if (PotentialUserAreas.Count > 0)
         {
-            for (int i = 0; i < spawnPerLevel; i++) // Example: spawn 10 objects
+            int spawnPerLevel = particleSpawnCount / PotentialUserAreas.Count;
+            foreach (var area in PotentialUserAreas)
             {
-                SpawnObjectWithinBounds(level.bounds);
+                for (int i = 0; i < spawnPerLevel; i++) // Example: spawn 10 objects
+                {
+                    SpawnObjectWithinBounds(area.rend.bounds);
+                }
             }
         }
+        else
+        {
+            int spawnPerLevel = particleSpawnCount / levels.Count;
+            foreach (var level in levels)
+            {
+                for (int i = 0; i < spawnPerLevel; i++) // Example: spawn 10 objects
+                {
+                    SpawnObjectWithinBounds(level.bounds);
+                }
+            }
+        }
+
 
     }
 
