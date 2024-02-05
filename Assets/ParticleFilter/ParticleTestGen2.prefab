@@ -8,6 +8,11 @@ PrefabInstance:
     serializedVersion: 3
     m_TransformParent: {fileID: 0}
     m_Modifications:
+    - target: {fileID: 1224898283149486014, guid: fb7dfb9d46779194cb73d743253b19e0,
+        type: 3}
+      propertyPath: m_Materials.Array.data[0]
+      value: 
+      objectReference: {fileID: 2100000, guid: aeca87863b5eba54ab639f437ffa1465, type: 2}
     - target: {fileID: 3437043929353867769, guid: fb7dfb9d46779194cb73d743253b19e0,
         type: 3}
       propertyPath: m_LocalRotation.w
@@ -43,6 +48,11 @@ PrefabInstance:
       propertyPath: isFirstGen
       value: 0
       objectReference: {fileID: 0}
+    - target: {fileID: 5028625306767554798, guid: fb7dfb9d46779194cb73d743253b19e0,
+        type: 3}
+      propertyPath: m_Materials.Array.data[0]
+      value: 
+      objectReference: {fileID: 2100000, guid: aeca87863b5eba54ab639f437ffa1465, type: 2}
     - target: {fileID: 5419720737513757941, guid: fb7dfb9d46779194cb73d743253b19e0,
         type: 3}
       propertyPath: m_Name
@@ -63,6 +73,16 @@ PrefabInstance:
       propertyPath: m_LocalScale.z
       value: 0.25
       objectReference: {fileID: 0}
+    - target: {fileID: 6177902224978142663, guid: fb7dfb9d46779194cb73d743253b19e0,
+        type: 3}
+      propertyPath: m_Materials.Array.data[0]
+      value: 
+      objectReference: {fileID: 2100000, guid: aeca87863b5eba54ab639f437ffa1465, type: 2}
+    - target: {fileID: 7050904652731482492, guid: fb7dfb9d46779194cb73d743253b19e0,
+        type: 3}
+      propertyPath: m_Materials.Array.data[0]
+      value: 
+      objectReference: {fileID: 2100000, guid: aeca87863b5eba54ab639f437ffa1465, type: 2}
     - target: {fileID: 8859199440520045546, guid: fb7dfb9d46779194cb73d743253b19e0,
         type: 3}
       propertyPath: m_Enabled

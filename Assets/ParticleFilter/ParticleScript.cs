@@ -10,12 +10,21 @@ public class ParticleScript : MonoBehaviour
     public Dictionary<string, float?> lastHits = new Dictionary<string, float?>();
     public Dictionary<string, float?> deltas = new Dictionary<string, float?>();
 
-    public float Age { get; private set; } = 0f;
+    public float totalHitDistance = 0;
+    public float totaldelta = 0;
+
+    public float Age = 0f;
 
     private Vector3 lastPosition;
     private Quaternion lastRotation;
 
-    public string nearestAreaName = "";
+    public Area nearestArea;
+
+    public Conecast conecast;
+
+    public bool ProvedItself = false;
+
+    public bool matchingSemantics = false;
 
     void Awake()
     {
@@ -48,6 +57,9 @@ public class ParticleScript : MonoBehaviour
         PerformRaycast(45, transform.up, "up-45");
         PerformRaycast(45, transform.right, "right-45");
 
+
+        totalHitDistance = 0;
+        totaldelta = 0;
         foreach (var kvp in currentHits)
         {
             string key = kvp.Key;
@@ -55,6 +67,8 @@ public class ParticleScript : MonoBehaviour
             float lastHit = lastHits.ContainsKey(key) ? lastHits[key] ?? 0 : 0;
             deltas[key] = currentHit - lastHit;
             lastHits[key] = currentHit;
+            totalHitDistance += currentHit;
+            totaldelta += currentHit - lastHit;
         }
 
         float totalDiff = 0;
@@ -76,7 +90,9 @@ public class ParticleScript : MonoBehaviour
             totalDiff += Mathf.Abs(particleDeltaValue.Value - deltaValue.Value);
 
         }
-        totalDifference = totalDiff;
+        totalDifference = (totalHitDistance == 80 && totaldelta == 0) ? 100 : totalDiff;
+        // if (totalDiff <= 1.5 && totalDiff > 0 && Age > 0.3f)
+        // ProvedItself = true;
     }
 
     void PerformRaycast(float angle, Vector3 axis, string axisName)
@@ -84,22 +100,6 @@ public class ParticleScript : MonoBehaviour
         Vector3 direction = Quaternion.AngleAxis(angle, axis) * transform.forward;
         string key = axisName + angle.ToString();
         RaycastAndDraw(direction, key);
-    }
-
-    void RaycastAndDraw(Vector3 direction)
-    {
-        Ray ray = new Ray(transform.position, direction);
-        RaycastHit hit;
-        if (Physics.Raycast(ray, out hit, 10f, 1 << 6))
-        {
-            if (!isFirstGen)
-                Debug.DrawLine(transform.position, hit.point, Age > 1 ? Color.yellow : Color.green);
-        }
-        else
-        {
-            if (!isFirstGen)
-                Debug.DrawRay(transform.position, direction * 10f, Color.red);
-        }
     }
 
     void RaycastAndDraw(Vector3 direction, string key)

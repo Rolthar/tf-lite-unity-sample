@@ -46,17 +46,45 @@ public class Conecast : MonoBehaviour
                 }
             }
         }
+
+        // Perform raycasts and filter out objects based on the raycast results
+        var objectsToRemove = new List<T>();
+        foreach (var obj in objectsInCone)
+        {
+            RaycastHit hitInfo;
+            Vector3 toObject = obj.transform.position - origin;
+            if (Physics.Raycast(origin, toObject.normalized, out hitInfo, toObject.magnitude))
+            {
+                // Check if the hit is not the object itself
+                if (hitInfo.collider.gameObject != obj.gameObject)
+                {
+                    // If the difference in distance is greater than 1, plan to remove the object from the list
+                    if (Mathf.Abs(hitInfo.distance - toObject.magnitude) > 1)
+                    {
+                        objectsToRemove.Add(obj);
+                    }
+                }
+            }
+        }
+
+        // Remove the objects that didn't pass the raycast check
+        foreach (var objToRemove in objectsToRemove)
+        {
+            objectsInCone.Remove(objToRemove);
+        }
+
         return objectsInCone;
     }
 
 
+
     void OnRenderObject()
     {
-        RuntimeGizmos.Cone(transform.position, transform.rotation, 8f, 60f, Color.white);
+        RuntimeGizmos.Cone(transform.position, transform.rotation, 8f, 60f, new Color(1, 1, 1, 0.3f), true);
     }
 
     void OnDrawGizmos()
     {
-        RuntimeGizmos.Cone(transform.position, transform.rotation, 8f, 60f, Color.white);
+        RuntimeGizmos.Cone(transform.position, transform.rotation, 8f, 60f, new Color(1, 1, 1, 0.3f), true);
     }
 }

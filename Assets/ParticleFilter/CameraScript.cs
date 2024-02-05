@@ -26,7 +26,9 @@ public class CameraScript : MonoBehaviour
 
     void Start()
     {
+#if UNITY_EDITOR
         SemanticCast.OnSemanticListUpdate.AddListener(UpdateFilterTwinWithAreas);
+#endif
     }
 
     public void UpdateFilterTwinWithAreas(List<SemanticItem> items)
@@ -61,8 +63,8 @@ public class CameraScript : MonoBehaviour
             lastHits[key] = currentHit;
         }
 
-        if (PositionDelta != Vector3.zero)
-            FilterTwin.Instance.probabilityThreshold = 5f;
+        // if (PositionDelta != Vector3.zero)
+        //     FilterTwin.Instance.probabilityThreshold = 5f;
     }
 
     void PerformRaycast(float angle, Vector3 axis, string axisName)

@@ -19,7 +19,7 @@ public class SsdSample : MonoBehaviour
     private Text framePrefab = null;
 
     [SerializeField, Range(0f, 1f)]
-    private float scoreThreshold = 0.5f;
+    private float scoreThreshold = 0.75f;
 
     [SerializeField]
     private TextAsset labelMap = null;
@@ -29,7 +29,6 @@ public class SsdSample : MonoBehaviour
     private string[] labels;
     public ARSession Session;
     public RenderTexture renderTexture;
-    public TMP_Text classesDisplayText;
 
     public List<SemanticItemType> semanticHistory = new();
     private void Start()
@@ -96,17 +95,22 @@ public class SsdSample : MonoBehaviour
             Invoke(renderTexture);
     }
 
+    public void UpdateFilterTwinWithAreas(List<SemanticItemType> items)
+    {
+        FilterTwin.Instance.UpdatePotentialAreas(items);
+    }
+
     private void Invoke(Texture texture)
     {
         ssd.Invoke(texture);
-        classesDisplayText.text = "";
+        semanticHistory = new();
         SSD.Result[] results = ssd.GetResults();
         Vector2 size = (frameContainer.transform as RectTransform).rect.size;
         for (int i = 0; i < 10; i++)
         {
             SetFrame(frames[i], results[i], size, out string objectText);
-            classesDisplayText.text = classesDisplayText.text + " " + objectText;
         }
+        UpdateFilterTwinWithAreas(semanticHistory);
     }
 
     private void SetFrame(Text frame, SSD.Result result, Vector2 size, out string text)
@@ -130,9 +134,9 @@ public class SsdSample : MonoBehaviour
         rt.anchoredPosition = result.rect.position * size - size * 0.5f;
         rt.sizeDelta = result.rect.size * size;
 
-        if(itemEnum != null)
+        if (itemEnum.HasValue)
         {
-            
+            semanticHistory.Add(itemEnum.Value);
         }
     }
 
@@ -148,6 +152,7 @@ public class SsdSample : MonoBehaviour
 
     public SemanticItemType? GetEnumFromString(string labelType)
     {
+        labelType = labelType.Replace(" ", "_");
         SemanticItemType result;
         if (System.Enum.TryParse(labelType, true, out result))
         {

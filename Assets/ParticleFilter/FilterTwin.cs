@@ -7,17 +7,25 @@ using ZebrarWayfinding;
 
 public class FilterTwin : MonoBehaviour
 {
+    public Transform CameraGuess;
     public static FilterTwin Instance;
     public static List<SemanticItem> SemanticItems = new();
 
     public GameObject particlePrefab;
     public GameObject particlePrefabGen2;
+    public int CullFrameTrigger = 5;
 
+    public int particleCount = 0;
+    public int topPerformingCount = 5;
 
     public int particleSpawnCount = 1000;
     public int particleSecondGenSpawnCount = 50;
+    public float semanticDifferenceWeight = 0.5f;
 
     private List<ParticleScript> particles = new();
+
+    public List<ParticleScript> topPerformingParticles = new();
+
     public List<MeshRenderer> levels = new();
     public List<Bounds> levelsBounds = new();
 
@@ -25,6 +33,9 @@ public class FilterTwin : MonoBehaviour
     public List<Area> PotentialUserAreas = new();
 
     public TMP_Text title;
+    public TMP_Text semanticEstimateOptions;
+    public TMP_Text semanticsCameraText;
+
     public MeshRenderer mesh;
 
     public bool cullParticles = false;
@@ -34,6 +45,10 @@ public class FilterTwin : MonoBehaviour
     public float probabilityThreshold = 1f;
 
     public float smallestDiff = 1f;
+
+    private List<SemanticItemType> cameraItemsCopy = new();
+
+    public float? CameraFloorOffset = 0;
 
     void Awake()
     {
@@ -59,7 +74,7 @@ public class FilterTwin : MonoBehaviour
     {
         if (cullParticles)
         {
-            if (frameCount >= 3)
+            if (frameCount >= CullFrameTrigger)
             {
                 CompareParticles();
                 frameCount = 0;
@@ -71,13 +86,30 @@ public class FilterTwin : MonoBehaviour
 
         // foreach (SemanticItem item in SemanticItems)
         //     Debug.Log(item.name);
+        UpdateCameraVerticalOffset();
 
+    }
+
+    public void UpdateCameraVerticalOffset()
+    {
+#if UNITY_EDITOR
+        var allFloors = Areas.Select(l => l.level.Floor).ToList();
+        CameraFloorOffset = allFloors.OrderBy(f => Vector3.Distance(f.position, Camera.main.transform.position)).FirstOrDefault().position.y;
+
+#endif
     }
 
     public void UpdatePotentialAreas(List<SemanticItem> cameraItems)
     {
+        string debugStringDemantics = "Editor Semantics: {";
+        cameraItemsCopy = cameraItems.Select(x => x.type).ToList();
+
         if (cameraItems.Count > 0)
         {
+            foreach (SemanticItem _item in cameraItems)
+            {
+                debugStringDemantics += _item.type.ToString();
+            }
             var potentialAreas = GetMatchingAreas(Areas, cameraItems);
             PotentialUserAreas = potentialAreas;
             string debugString = "Potential Areas from semantics: {";
@@ -86,10 +118,36 @@ public class FilterTwin : MonoBehaviour
                 debugString += _area.Name;
             }
             debugString += "}";
-            Debug.Log(debugString);
+            semanticEstimateOptions.text = debugString;
         }
+        debugStringDemantics += "}";
+        semanticsCameraText.text = debugStringDemantics;
     }
 
+    public void UpdatePotentialAreas(List<SemanticItemType> cameraItems)
+    {
+        string debugStringDemantics = "Device Semantics: {";
+        cameraItemsCopy = cameraItems;
+
+        if (cameraItems.Count > 0)
+        {
+            foreach (SemanticItemType _item in cameraItems)
+            {
+                debugStringDemantics += _item.ToString();
+            }
+            var potentialAreas = GetMatchingAreas(Areas, cameraItems);
+            PotentialUserAreas = potentialAreas;
+            string debugString = "Potential Areas from semantics: {";
+            foreach (Area _area in potentialAreas)
+            {
+                debugString += _area.Name;
+            }
+            debugString += "}";
+            semanticEstimateOptions.text = debugString;
+        }
+        debugStringDemantics += "}";
+        semanticsCameraText.text = debugStringDemantics;
+    }
 
     public List<Area> GetMatchingAreas(List<Area> areas, List<SemanticItem> cameraSemanticItems)
     {
@@ -109,124 +167,122 @@ public class FilterTwin : MonoBehaviour
                 areaItemCounts.TryGetValue(cameraItem.Key, out var countInArea) && countInArea >= cameraItem.Value);
 
             if (isMatch)
-            {
                 matchingAreas.Add(area);
-            }
         }
-
         return matchingAreas;
     }
 
-    // public static List<Area> GetMatchingAreas(List<Area> areas, List<SemanticItem> cameraSemanticItems)
-    // {
-    //     // Extract the distinct types of SemanticItems seen by the camera
-    //     var cameraItemTypes = new HashSet<SemanticItemType>(cameraSemanticItems.Select(item => item.type));
-
-    //     var matchingAreas = new List<Area>();
-
-    //     foreach (var area in areas)
-    //     {
-    //         // Create a set of item types present in the area
-    //         var areaItemTypes = new HashSet<SemanticItemType>(area.SemanticsInArea.Select(item => item.type));
-
-    //         // Check if all item types seen by the camera are present in the area
-    //         if (!cameraItemTypes.Except(areaItemTypes).Any())
-    //         {
-    //             matchingAreas.Add(area);
-    //         }
-    //     }
-
-    //     return matchingAreas;
-    // }
-
-
-    public static List<Area> GetAreasContainingAllCameraItems(List<Area> areas, List<SemanticItem> cameraSemanticItems)
+    public List<Area> GetMatchingAreas(List<Area> areas, List<SemanticItemType> cameraSemanticItemTypes)
     {
-        // Convert the list of SemanticItems seen by the camera into a list of their types
-        var cameraItemTypes = new HashSet<SemanticItemType>(cameraSemanticItems.Select(item => item.type));
+        // Count the occurrences of each SemanticItemType seen by the camera
+        var cameraItemTypeCounts = cameraSemanticItemTypes.GroupBy(type => type)
+            .ToDictionary(group => group.Key, group => group.Count());
 
-        // Find areas that contain all the semantic item types seen by the camera
         var matchingAreas = new List<Area>();
 
         foreach (var area in areas)
         {
-            // Get the types of SemanticItems in the current area
-            var areaItemTypes = new HashSet<SemanticItemType>(area.SemanticsInArea.Select(item => item.type));
+            var areaItemTypeCounts = area.SemanticsInArea.GroupBy(item => item.type)
+                .ToDictionary(group => group.Key, group => group.Count());
 
-            // Check if this area contains all types of items seen by the camera
-            if (cameraItemTypes.All(type => areaItemTypes.Contains(type)))
-            {
+            // Check if the current area matches the camera's view
+            bool isMatch = cameraItemTypeCounts.All(cameraItemType =>
+                areaItemTypeCounts.TryGetValue(cameraItemType.Key, out var countInArea) && countInArea >= cameraItemType.Value);
+
+            if (isMatch)
                 matchingAreas.Add(area);
-            }
         }
-
         return matchingAreas;
     }
-
 
     public void CompareParticles()
     {
         List<ParticleScript> particlesToRemove = new List<ParticleScript>();
-        particles = particles.OrderBy(p => p.totalDifference).ToList();
-        smallestDiff = particles.OrderBy(p => p.totalDifference).FirstOrDefault().totalDifference;
 
-        for (int i = 5; i < particles.Count; i++)
+        if (cameraItemsCopy.Count > 0)
         {
-            particlesToRemove.Add(particles[i]);
-        }
-
-
-        // Remove the particles after the iteration
-        var removeCount = particlesToRemove.Count;
-        foreach (var particle in particlesToRemove)
-        {
-            particles.Remove(particle);
-            Destroy(particle.transform.parent.gameObject);
-        }
-        title.text = GetAreaAndLevelName(particles[0].gameObject);
-
-        var best5 = new List<ParticleScript>(particles.Take(5).ToList());
-        particlesToRemove = new List<ParticleScript>(particles.Skip(5).ToList());
-        foreach (var particle in particlesToRemove)
-        {
-            particles.Remove(particle);
-            Destroy(particle.transform.parent.gameObject);
-        }
-        SpawnParticles();
-        SpawnNewParticles(best5, smallestDiff);
-
-
-    }
-    public void SpawnNewParticles(int count, float maxSpawnRadius)
-    {
-        List<ParticleScript> newParticles = new List<ParticleScript>();
-
-        foreach (var particle in particles)
-        {
-            for (int i = 0; i < count; i++)
+            foreach (var particle in particles)
             {
-                GameObject part = particle.gameObject;
+                List<SemanticItemType> conecastItemTypes = particle.conecast.SemanticGazeList.Select(item => item.type).ToList();
+                // Lists to hold matching and non-matching items
+                List<SemanticItemType> matchingItems = new List<SemanticItemType>();
+                List<SemanticItemType> nonMatchingItems = new List<SemanticItemType>();
 
-                float age = particle != null ? particle.Age : 0f;
-                float spawnRadius = CalculateSpawnRadius(age, maxSpawnRadius);
+                // Count occurrences of each type in both lists
+                var cameraItemCount = cameraItemsCopy.GroupBy(x => x)
+                    .ToDictionary(x => x.Key, x => x.Count());
 
+                var conecastItemCount = conecastItemTypes.GroupBy(x => x)
+                    .ToDictionary(x => x.Key, x => x.Count());
 
-                Vector3 spawnPosition = part.transform.position + Random.insideUnitSphere * spawnRadius;
-                spawnPosition = EnsurePositionWithinBounds(spawnPosition);
+                bool allmatch = true;
+                foreach (var item in particle.conecast.SemanticGazeList)
+                {
+                    // Determine if the current item's type matches the occurrences in the camera's list
+                    bool isMatch = cameraItemCount.TryGetValue(item.type, out int cameraCount) &&
+                                   conecastItemCount.TryGetValue(item.type, out int conecastCount) &&
+                                   cameraCount == conecastCount;
 
-                // Quaternion randomRotation = Quaternion.Euler(Random.Range(0, 360), Random.Range(0, 360), Random.Range(0, 360));
+                    if (isMatch)
+                    {
+                        particle.totalDifference -= semanticDifferenceWeight;
+                        matchingItems.Add(item.type);
+                    }
+                    else
+                    {
+                        particle.totalDifference += semanticDifferenceWeight;
+                        nonMatchingItems.Add(item.type);
+                        allmatch = false;
+                    }
+                }
+                if (allmatch)
+                    Debug.Log("ALL MATCH!@!!!!");
 
-                var newParticle = Instantiate(particlePrefab);
-                var script = newParticle.GetComponentInChildren<ParticleScript>();
-                script.transform.localPosition = spawnPosition;
-                script.transform.localRotation = Camera.main.transform.rotation;
-                newParticles.Add(script);
+                particle.matchingSemantics = allmatch && particle.conecast.SemanticGazeList.Count == cameraItemsCopy.Count;
             }
         }
 
-        // Merge new particles with the existing list
-        particles.AddRange(newParticles);
+        particles = particles.OrderBy(p => p.totalDifference).ToList();
+
+        // var particlesWithSemantics = particles.Where(p => p.matchingSemantics == true && p.totalDifference != 0).ToList();
+        // var particlesWithSemanticsOrdered = particlesWithSemantics.OrderBy(p => p.totalDifference > 0).ToList();
+
+        smallestDiff = particles.OrderBy(p => p.totalDifference).FirstOrDefault().totalDifference;
+
+        // for (int i = 5; i < particles.Count; i++)
+        // {
+        //     particlesToRemove.Add(particles[i]);
+        // }
+
+        // // Remove the particles after the iteration
+        // var removeCount = particlesToRemove.Count;
+        // foreach (var particle in particlesToRemove)
+        // {
+        //     particles.Remove(particle);
+        //     Destroy(particle.transform.parent.gameObject);
+        //     particleCount--;
+        // }
+        title.text = GetAreaAndLevelName(particles[0]);
+        CameraGuess.transform.position = particles[0].transform.position;
+        CameraGuess.transform.rotation = particles[0].transform.rotation;
+
+        topPerformingParticles = new List<ParticleScript>(particles.Take(topPerformingCount).ToList());
+        particlesToRemove = new List<ParticleScript>(particles.Skip(topPerformingCount).ToList());
+        foreach (var particle in particlesToRemove)
+        {
+            if (!particle.ProvedItself)
+            {
+                particles.Remove(particle);
+                Destroy(particle.transform.parent.gameObject);
+                particleCount--;
+            }
+        }
+        SpawnParticles();
+        SpawnNewParticles(topPerformingParticles, smallestDiff);
+
+
     }
+
 
     public void SpawnNewParticles(List<ParticleScript> bestPerformingParticles, float maxSpawnRadius)
     {
@@ -236,6 +292,7 @@ public class FilterTwin : MonoBehaviour
         {
             float age = particle != null ? particle.Age : 0f;
             float spawnRadius = CalculateSpawnRadius(age, maxSpawnRadius);
+            var semanticsInArea = particle.nearestArea.SemanticsInArea.Where(semantic => cameraItemsCopy.Contains(semantic.type)).ToList();
 
             for (int j = 0; j < particleSecondGenSpawnCount; j++)
             {
@@ -243,13 +300,28 @@ public class FilterTwin : MonoBehaviour
                 Vector3 spawnPosition = particle.transform.position + Random.insideUnitSphere * spawnRadius;
                 spawnPosition = EnsurePositionWithinBounds(spawnPosition);
 
-                Quaternion randomRotation = Quaternion.Euler(Camera.main.transform.eulerAngles.x, Random.Range(0, 360), Camera.main.transform.eulerAngles.z);
+                Quaternion randomRotation = Quaternion.Euler(Camera.main.transform.eulerAngles.x, particle.transform.eulerAngles.y + Random.Range(-15f, 15f), Camera.main.transform.eulerAngles.z);
+                if (semanticsInArea.Count > 0)
+                {
+                    var lookPosition = semanticsInArea[Random.Range(0, semanticsInArea.Count)].transform.position;
+                    Vector3 directionToLook = (lookPosition - particle.transform.position).normalized;
+                    // Create a rotation that looks at lookPosition
+                    Quaternion lookRotation = Quaternion.LookRotation(directionToLook);
+
+                    // Extract the Y component of this rotation
+                    float yRotation = lookRotation.eulerAngles.y + Random.Range(-15f, 15f);
+
+                    // Combine Camera's X and Z with the Y component from lookRotation
+                    randomRotation = Quaternion.Euler(Camera.main.transform.eulerAngles.x, yRotation, Camera.main.transform.eulerAngles.z);
+                }
 
                 var newParticle = Instantiate(particlePrefabGen2);
+                particleCount++;
                 var script = newParticle.GetComponentInChildren<ParticleScript>();
                 script.isFirstGen = false;
                 script.transform.localPosition = spawnPosition;
                 script.transform.localRotation = randomRotation;
+                script.nearestArea = particle.nearestArea;
                 newParticles.Add(script);
             }
 
@@ -268,7 +340,7 @@ public class FilterTwin : MonoBehaviour
         if (age < 5f)
         {
             // Interpolate between maxRadius and minRadius based on age
-            radius = Mathf.Lerp(maxRadius, minRadius, age / 5f);
+            radius = Mathf.Lerp(maxRadius, minRadius, age / 3f);
         }
         else
         {
@@ -287,20 +359,43 @@ public class FilterTwin : MonoBehaviour
             int spawnPerLevel = particleSpawnCount / PotentialUserAreas.Count;
             foreach (var area in PotentialUserAreas)
             {
-                for (int i = 0; i < spawnPerLevel; i++) // Example: spawn 10 objects
+                var semanticsInArea = area.SemanticsInArea.Where(semantic => cameraItemsCopy.Contains(semantic.type)).ToList();
+                var spawnBounds = area.rend.bounds;
+                var semanticsBounds = CreateBoundsForEachGameObject(semanticsInArea.Select(x => x.gameObject).ToList(), 5);
+                spawnPerLevel /= semanticsBounds.Count > 0 ? semanticsBounds.Count : 1;
+
+
+                foreach (Bounds _bounds in semanticsBounds)
                 {
-                    SpawnObjectWithinBounds(area.rend.bounds);
+                    for (int i = 0; i < spawnPerLevel; i++)
+                    {
+
+                        Bounds intersectionBounds = new Bounds();
+                        if (spawnBounds.Intersects(_bounds))
+                        {
+                            intersectionBounds.SetMinMax(
+                                Vector3.Max(spawnBounds.min, _bounds.min),
+                                Vector3.Min(spawnBounds.max, _bounds.max)
+                            );
+                            SpawnObjectWithinBounds(intersectionBounds, area, _bounds.center);
+                        }
+                        else
+                            SpawnObjectWithinBounds(_bounds, area, _bounds.center);
+                    }
                 }
+
+
+
             }
         }
         else
         {
-            int spawnPerLevel = particleSpawnCount / levels.Count;
-            foreach (var level in levels)
+            int spawnPerLevel = particleSpawnCount / Areas.Count;
+            foreach (var area in Areas)
             {
-                for (int i = 0; i < spawnPerLevel; i++) // Example: spawn 10 objects
+                for (int i = 0; i < spawnPerLevel; i++)
                 {
-                    SpawnObjectWithinBounds(level.bounds);
+                    SpawnObjectWithinBounds(area.rend.bounds, area);
                 }
             }
         }
@@ -332,12 +427,28 @@ public class FilterTwin : MonoBehaviour
                 nearestBound = bound;
             }
         }
-
         // Return the nearest point within the nearest bound
         return nearestBound.ClosestPoint(position);
     }
 
-    void SpawnObjectWithinBounds(Bounds bounds)
+    public List<Bounds> CreateBoundsForEachGameObject(List<GameObject> gameObjects, float radius)
+    {
+        List<Bounds> boundsList = new List<Bounds>();
+
+        foreach (var gameObject in gameObjects)
+        {
+            if (gameObject != null)
+            {
+                // Create bounds for each GameObject using its position and the specified radius (_x)
+                Bounds bounds = new Bounds(gameObject.transform.position, Vector3.one * (radius * 2)); // Radius * 2 to get the diameter for bounds size
+                boundsList.Add(bounds);
+            }
+        }
+
+        return boundsList;
+    }
+
+    void SpawnObjectWithinBounds(Bounds bounds, Area area, Vector3? lookPosition = null)
     {
 
         float x = Random.Range(bounds.min.x, bounds.max.x);
@@ -347,23 +458,38 @@ public class FilterTwin : MonoBehaviour
         Vector3 randomPosition = new Vector3(x, y, z);
         Quaternion randomRotation = Quaternion.Euler(Camera.main.transform.eulerAngles.x, Random.Range(0, 360), Camera.main.transform.eulerAngles.z);
 
+        if (lookPosition.HasValue)
+        {
+            Vector3 directionToLook = (lookPosition.Value - randomPosition).normalized;
+            // Create a rotation that looks at lookPosition
+            Quaternion lookRotation = Quaternion.LookRotation(directionToLook);
+
+            // Extract the Y component of this rotation
+            float yRotation = lookRotation.eulerAngles.y + Random.Range(-15f, 15f);
+
+            // Combine Camera's X and Z with the Y component from lookRotation
+            randomRotation = Quaternion.Euler(Camera.main.transform.eulerAngles.x, yRotation, Camera.main.transform.eulerAngles.z);
+        }
+
         var particle = Instantiate(particlePrefab);
+        particleCount++;
         var script = particle.GetComponentInChildren<ParticleScript>();
         script.transform.localPosition = randomPosition;
         script.transform.localRotation = randomRotation;
+        script.nearestArea = area;
         particles.Add(script);
 
     }
 
 
-    public string GetAreaAndLevelName(GameObject obj)
+    public string GetAreaAndLevelName(ParticleScript obj)
     {
         foreach (Area area in Areas)
         {
             if (area.rend.bounds.Contains(obj.transform.position))
             {
                 // Format the string to return Area Name and Level Name
-                return area.Name + " " + (area.level != null ? area.level.Name : "No Level");
+                return area.Name + " " + (area.level != null ? area.level.Name : "No Level") + " (" + obj.totalDifference + ")";
             }
         }
         return "Not in any Area";
