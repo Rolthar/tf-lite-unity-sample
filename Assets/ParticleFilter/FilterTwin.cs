@@ -298,13 +298,11 @@ public class FilterTwin : MonoBehaviour
                     particleCount--;
                 }
             }
+
+            SpawnNewParticles(topPerformingParticles, smallestDiff);
         }
 
         SpawnParticles();
-        if (particles.Count > 0)
-            SpawnNewParticles(topPerformingParticles, smallestDiff);
-
-
     }
 
 
