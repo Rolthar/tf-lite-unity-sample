@@ -4,10 +4,14 @@ using System.Linq;
 using UnityEngine;
 using TMPro;
 using ZebrarWayfinding;
+using easyar;
 
 public class FilterTwin : MonoBehaviour
 {
     public Transform CameraGuess;
+    public Transform TopPerformingRoot;
+    public Transform ParticleRoot;
+
     public static FilterTwin Instance;
     public static List<SemanticItem> SemanticItems = new();
 
@@ -20,7 +24,7 @@ public class FilterTwin : MonoBehaviour
 
     public int particleSpawnCount = 1000;
     public int particleSecondGenSpawnCount = 50;
-    public float semanticDifferenceWeight = 0.5f;
+    public float semanticEdge = 0.5f;
 
     private List<ParticleScript> particles = new();
 
@@ -35,6 +39,7 @@ public class FilterTwin : MonoBehaviour
     public TMP_Text title;
     public TMP_Text semanticEstimateOptions;
     public TMP_Text semanticsCameraText;
+    public TMP_Text cameraHeight;
 
     public MeshRenderer mesh;
 
@@ -49,6 +54,8 @@ public class FilterTwin : MonoBehaviour
     private List<SemanticItemType> cameraItemsCopy = new();
 
     public float? CameraFloorOffset = 0;
+
+    public DenseSpatialMapBuilderFrameFilter DenseMapBuilder;
 
     void Awake()
     {
@@ -92,11 +99,20 @@ public class FilterTwin : MonoBehaviour
 
     public void UpdateCameraVerticalOffset()
     {
-#if UNITY_EDITOR
-        var allFloors = Areas.Select(l => l.level.Floor).ToList();
-        CameraFloorOffset = allFloors.OrderBy(f => Vector3.Distance(f.position, Camera.main.transform.position)).FirstOrDefault().position.y;
+        Ray ray = new Ray(CameraScript.Instance.transform.position, Vector3.down);
+        RaycastHit hit;
+        if (Physics.Raycast(ray, out hit, 3f, CameraScript.Instance.raycastScript.hitLayers))
+        {
+            CameraFloorOffset = hit.distance;
+            cameraHeight.text = $"Offset:{CameraFloorOffset.Value.ToString()}";
+            Debug.DrawLine(CameraScript.Instance.transform.position, hit.point, Color.green);
 
-#endif
+        }
+        else
+        {
+            Debug.DrawRay(CameraScript.Instance.transform.position, Vector3.down * 3f, Color.red);
+        }
+
     }
 
     public void UpdatePotentialAreas(List<SemanticItem> cameraItems)
@@ -225,50 +241,27 @@ public class FilterTwin : MonoBehaviour
 
                     if (isMatch)
                     {
-                        particle.totalDifference -= semanticDifferenceWeight;
                         matchingItems.Add(item.type);
                     }
                     else
                     {
-                        particle.totalDifference += semanticDifferenceWeight;
                         nonMatchingItems.Add(item.type);
                         allmatch = false;
                     }
                 }
-                if (allmatch)
-                    Debug.Log("ALL MATCH!@!!!!");
+                particle.matchingSemanticsCount = matchingItems.Count;
+                Debug.Log($" uuid: {particle.uuid}, {conecastItemCount.Count / cameraItemCount.Count}, cone: {conecastItemCount.Count}, cameraItemCount:{cameraItemCount.Count} ");
 
-                particle.matchingSemantics = allmatch && particle.conecast.SemanticGazeList.Count == cameraItemsCopy.Count;
+                if (allmatch)
+                    particle.totalDifference *= semanticEdge;
+
             }
         }
 
-        particles = particles.OrderBy(p => p.totalDifference).ToList();
-
-        // var particlesWithSemantics = particles.Where(p => p.matchingSemantics == true && p.totalDifference != 0).ToList();
-        // var particlesWithSemanticsOrdered = particlesWithSemantics.OrderBy(p => p.totalDifference > 0).ToList();
-
-        smallestDiff = particles.OrderBy(p => p.totalDifference).FirstOrDefault().totalDifference;
-
-        // for (int i = 5; i < particles.Count; i++)
-        // {
-        //     particlesToRemove.Add(particles[i]);
-        // }
-
-        // // Remove the particles after the iteration
-        // var removeCount = particlesToRemove.Count;
-        // foreach (var particle in particlesToRemove)
-        // {
-        //     particles.Remove(particle);
-        //     Destroy(particle.transform.parent.gameObject);
-        //     particleCount--;
-        // }
-        title.text = GetAreaAndLevelName(particles[0]);
-        CameraGuess.transform.position = particles[0].transform.position;
-        CameraGuess.transform.rotation = particles[0].transform.rotation;
-
-        topPerformingParticles = new List<ParticleScript>(particles.Take(topPerformingCount).ToList());
-        particlesToRemove = new List<ParticleScript>(particles.Skip(topPerformingCount).ToList());
-        foreach (var particle in particlesToRemove)
+        var particlesWithoutSemantics = new List<ParticleScript>(particles.Where(_particles => _particles.matchingSemanticsCount == 0).ToList());
+        var particlesWithSemantics = new List<ParticleScript>(particles.Where(_particles => _particles.matchingSemanticsCount > 0).ToList());
+        particlesWithSemantics = particlesWithSemantics.OrderBy(p => p.matchingSemanticsCount).ToList();
+        foreach (var particle in particlesWithoutSemantics)
         {
             if (!particle.ProvedItself)
             {
@@ -277,8 +270,39 @@ public class FilterTwin : MonoBehaviour
                 particleCount--;
             }
         }
+
+        if (particles.Count > 0)
+        {
+            particles = new List<ParticleScript>(particlesWithSemantics).OrderBy(p => p.totalDifference * p.matchingSemanticsCount).ToList();
+            smallestDiff = particles.OrderBy(p => p.totalDifference).FirstOrDefault().totalDifference;
+
+            title.text = GetAreaAndLevelName(particles[0]);
+            Debug.Log($"Top: {particles[0].uuid}, {particles[0].totalDifference}");
+            CameraGuess.transform.position = particles[0].transform.position;
+            CameraGuess.transform.rotation = particles[0].transform.rotation;
+
+            topPerformingParticles = new List<ParticleScript>(particles.Take(topPerformingCount).ToList());
+
+            foreach (var particle in topPerformingParticles)
+            {
+                particle.transform.parent.parent = TopPerformingRoot;
+            }
+            Debug.Log(topPerformingParticles.Count);
+            particlesToRemove = new List<ParticleScript>(particles.Skip(topPerformingCount).ToList());
+            foreach (var particle in particlesToRemove)
+            {
+                if (!particle.ProvedItself)
+                {
+                    particles.Remove(particle);
+                    Destroy(particle.transform.parent.gameObject);
+                    particleCount--;
+                }
+            }
+        }
+
         SpawnParticles();
-        SpawnNewParticles(topPerformingParticles, smallestDiff);
+        if (particles.Count > 0)
+            SpawnNewParticles(topPerformingParticles, smallestDiff);
 
 
     }
@@ -298,6 +322,7 @@ public class FilterTwin : MonoBehaviour
             {
 
                 Vector3 spawnPosition = particle.transform.position + Random.insideUnitSphere * spawnRadius;
+                spawnPosition.y = CameraFloorOffset.HasValue ? (particle.nearestArea.level.Floor.position.y + CameraFloorOffset.Value) : spawnPosition.y;
                 spawnPosition = EnsurePositionWithinBounds(spawnPosition);
 
                 Quaternion randomRotation = Quaternion.Euler(Camera.main.transform.eulerAngles.x, particle.transform.eulerAngles.y + Random.Range(-15f, 15f), Camera.main.transform.eulerAngles.z);
@@ -315,7 +340,7 @@ public class FilterTwin : MonoBehaviour
                     randomRotation = Quaternion.Euler(Camera.main.transform.eulerAngles.x, yRotation, Camera.main.transform.eulerAngles.z);
                 }
 
-                var newParticle = Instantiate(particlePrefabGen2);
+                var newParticle = Instantiate(particlePrefabGen2, ParticleRoot);
                 particleCount++;
                 var script = newParticle.GetComponentInChildren<ParticleScript>();
                 script.isFirstGen = false;
@@ -452,7 +477,7 @@ public class FilterTwin : MonoBehaviour
     {
 
         float x = Random.Range(bounds.min.x, bounds.max.x);
-        float y = Random.Range(bounds.min.y, bounds.max.y);
+        float y = CameraFloorOffset.HasValue ? (area.level.Floor.position.y + CameraFloorOffset.Value) : Random.Range(bounds.min.y, bounds.max.y);
         float z = Random.Range(bounds.min.z, bounds.max.z);
 
         Vector3 randomPosition = new Vector3(x, y, z);
@@ -471,7 +496,7 @@ public class FilterTwin : MonoBehaviour
             randomRotation = Quaternion.Euler(Camera.main.transform.eulerAngles.x, yRotation, Camera.main.transform.eulerAngles.z);
         }
 
-        var particle = Instantiate(particlePrefab);
+        var particle = Instantiate(particlePrefab, ParticleRoot);
         particleCount++;
         var script = particle.GetComponentInChildren<ParticleScript>();
         script.transform.localPosition = randomPosition;
