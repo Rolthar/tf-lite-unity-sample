@@ -5,6 +5,7 @@ using easyar;
 using TMPro;
 using System.Collections.Generic;
 using ZebrarWayfinding;
+using System;
 
 
 public class SsdSample : MonoBehaviour
@@ -87,6 +88,11 @@ public class SsdSample : MonoBehaviour
     private void OnDestroy()
     {
         ssd?.Dispose();
+    }
+
+    public void OnSliderChange(float newVal)
+    {
+        scoreThreshold = newVal;
     }
 
     void Update()

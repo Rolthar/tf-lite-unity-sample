@@ -27,6 +27,7 @@ public class FilterTwin : MonoBehaviour
     public float semanticEdge = 0.5f;
 
     private List<ParticleScript> particles = new();
+    public List<ParticleScript> provedThemSelves = new();
 
     public List<ParticleScript> topPerformingParticles = new();
 
@@ -40,6 +41,8 @@ public class FilterTwin : MonoBehaviour
     public TMP_Text semanticEstimateOptions;
     public TMP_Text semanticsCameraText;
     public TMP_Text cameraHeight;
+    public TMP_Text provenparticlesText;
+    public TMP_Text debugText;
 
     public MeshRenderer mesh;
 
@@ -47,7 +50,6 @@ public class FilterTwin : MonoBehaviour
     private int frameCount = 0;
 
     public float compareThreshold = 0.5f;
-    public float probabilityThreshold = 1f;
 
     public float smallestDiff = 1f;
 
@@ -79,24 +81,80 @@ public class FilterTwin : MonoBehaviour
 
     void Update()
     {
+        if (CameraScript.Instance)
+        {
+            var pos = CameraScript.Instance.transform.position;
+            var rot = CameraScript.Instance.transform.eulerAngles;
+            debugText.text = $"p({System.Math.Round(pos.x, 2)},{System.Math.Round(pos.y, 2)},{System.Math.Round(pos.z, 2)}) r({System.Math.Round(rot.x, 2)},{System.Math.Round(rot.y, 2)},{System.Math.Round(rot.z, 2)})";
+        }
+
         if (cullParticles)
         {
-            if (frameCount >= CullFrameTrigger)
+            if (frameCount > CullFrameTrigger)
             {
                 CompareParticles();
                 frameCount = 0;
             }
             frameCount++;
         }
-        if (probabilityThreshold - Time.deltaTime > 0.3)
-            probabilityThreshold -= Time.deltaTime;
+        else if (!cullParticles && provedThemSelves.Count >= 1)
+        {
+            UpdateCameraGuessFromProven();
+        }
 
-        // foreach (SemanticItem item in SemanticItems)
-        //     Debug.Log(item.name);
+
+        if (provedThemSelves.Count >= 1)
+            cullParticles = false;
+
+        UpdateProvenParticlesText();
         UpdateCameraVerticalOffset();
-
     }
 
+    public void RestartLocalization()
+    {
+        cullParticles = false;
+        var allParticles = GameObject.FindObjectsOfType<ParticleScript>();
+        foreach (var particle in allParticles)
+        {
+            Destroy(particle.transform.parent.gameObject);
+        }
+        particleCount = 0;
+        particles = new();
+        topPerformingParticles = new();
+        provedThemSelves = new();
+        cullParticles = true;
+    }
+
+    public void UpdateCameraGuessFromProven()
+    {
+        var allParticles = GameObject.FindObjectsOfType<ParticleScript>();
+        foreach (var particle in allParticles)
+        {
+            if (!provedThemSelves.Contains(particle))
+                Destroy(particle.transform.parent.gameObject);
+        }
+
+        particleCount = 0;
+        particles = new();
+        topPerformingParticles = new();
+
+        title.text = GetAreaAndLevelName(provedThemSelves[0]);
+        //        Debug.Log($"Top: {provedThemSelves[0].uuid}, {provedThemSelves[0].totalDifference}");
+        CameraGuess.transform.position = provedThemSelves[0].transform.position;
+        CameraGuess.transform.rotation = provedThemSelves[0].transform.rotation;
+    }
+
+
+    public void UpdateProvenParticlesText()
+    {
+        var targetString = "[";
+        foreach (var particle in provedThemSelves)
+        {
+            targetString += System.Math.Round(particle.totalDifference, 2).ToString() + ",";
+        }
+        targetString += "]";
+        provenparticlesText.text = targetString;
+    }
     public void UpdateCameraVerticalOffset()
     {
         Ray ray = new Ray(CameraScript.Instance.transform.position, Vector3.down);
@@ -215,10 +273,17 @@ public class FilterTwin : MonoBehaviour
     {
         List<ParticleScript> particlesToRemove = new List<ParticleScript>();
 
+        // foreach (var particle in particles)
+        // {
+        //     particle.averageDifferenceSinceCull /= (float)CullFrameTrigger;
+        // }
         if (cameraItemsCopy.Count > 0)
         {
             foreach (var particle in particles)
             {
+                if (particle.ProvedItself && !provedThemSelves.Contains(particle))
+                    provedThemSelves.Add(particle);
+
                 List<SemanticItemType> conecastItemTypes = particle.conecast.SemanticGazeList.Select(item => item.type).ToList();
                 // Lists to hold matching and non-matching items
                 List<SemanticItemType> matchingItems = new List<SemanticItemType>();
@@ -273,7 +338,7 @@ public class FilterTwin : MonoBehaviour
 
         if (particles.Count > 0)
         {
-            particles = new List<ParticleScript>(particlesWithSemantics).OrderBy(p => p.totalDifference * p.matchingSemanticsCount).ToList();
+            particles = new List<ParticleScript>(particlesWithSemantics).OrderBy(p => p.matchingSemanticsCount == 0 ? (p.totalDifference * p.matchingSemanticsCount * p.averageDifferenceSinceCull) : p.totalDifference).ToList();
             smallestDiff = particles.OrderBy(p => p.totalDifference).FirstOrDefault().totalDifference;
 
             title.text = GetAreaAndLevelName(particles[0]);
