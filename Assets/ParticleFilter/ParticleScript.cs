@@ -62,10 +62,8 @@ public class ParticleScript : MonoBehaviour
         int validCurrentHitComparisons = 0;
         int validDeltaComparisons = 0;
 
-        // Access the CameraScript's CustomRaycastScript for comparison
         CustomRaycastScript cameraRaycastScript = CameraScript.Instance.raycastScript;
 
-        // Calculate differences in current hits
         foreach (var particleHit in raycastScript.currentHits)
         {
             string key = particleHit.Key;
@@ -88,7 +86,6 @@ public class ParticleScript : MonoBehaviour
             float particleDeltaValue = particleDelta.Value;
             if (cameraRaycastScript.deltas.TryGetValue(key, out float cameraDeltaValue))
             {
-                // Skip comparison if either delta is Mathf.Infinity, which signifies no previous hit
                 if (particleDeltaValue != Mathf.Infinity && cameraDeltaValue != Mathf.Infinity)
                 {
                     totalDeltaDifference += Mathf.Abs(particleDeltaValue - cameraDeltaValue);
@@ -97,7 +94,6 @@ public class ParticleScript : MonoBehaviour
             }
         }
 
-        // Calculate averages, being mindful of division by zero
         float averageCurrentHitDifference = validCurrentHitComparisons > 0 ? totalCurrentHitDifference / validCurrentHitComparisons : 0;
         // Debug.Log($"Total Current Hit Difference: {totalCurrentHitDifference}, Based on {validCurrentHitComparisons} comparisons");
         // Debug.Log($"Average Current Hit Difference: {averageCurrentHitDifference}");
@@ -115,7 +111,7 @@ public class ParticleScript : MonoBehaviour
 
         totalDifference = averageCurrentHitDifference;
         transform.localScale = Vector3.Lerp(Vector3.one, Vector3.zero, totalDifference);
-        if (totalDifference < 0.15 && Age > 3)
+        if (totalDifference < 0.1 && Age > 1)
             ProvedItself = true;
     }
 }

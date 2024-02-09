@@ -103,7 +103,7 @@ public class FilterTwin : MonoBehaviour
         }
 
 
-        if (provedThemSelves.Count >= 1)
+        if (provedThemSelves.Count >= 3)
             cullParticles = false;
 
         UpdateProvenParticlesText();
@@ -113,7 +113,7 @@ public class FilterTwin : MonoBehaviour
     public void RestartLocalization()
     {
         cullParticles = false;
-        var allParticles = GameObject.FindObjectsOfType<ParticleScript>();
+        var allParticles = FindObjectsOfType<ParticleScript>();
         foreach (var particle in allParticles)
         {
             Destroy(particle.transform.parent.gameObject);
@@ -127,7 +127,7 @@ public class FilterTwin : MonoBehaviour
 
     public void UpdateCameraGuessFromProven()
     {
-        var allParticles = GameObject.FindObjectsOfType<ParticleScript>();
+        var allParticles = FindObjectsOfType<ParticleScript>();
         foreach (var particle in allParticles)
         {
             if (!provedThemSelves.Contains(particle))
@@ -139,7 +139,6 @@ public class FilterTwin : MonoBehaviour
         topPerformingParticles = new();
 
         title.text = GetAreaAndLevelName(provedThemSelves[0]);
-        //        Debug.Log($"Top: {provedThemSelves[0].uuid}, {provedThemSelves[0].totalDifference}");
         CameraGuess.transform.position = provedThemSelves[0].transform.position;
         CameraGuess.transform.rotation = provedThemSelves[0].transform.rotation;
     }
@@ -154,6 +153,16 @@ public class FilterTwin : MonoBehaviour
         }
         targetString += "]";
         provenparticlesText.text = targetString;
+
+        if (provedThemSelves.Count >= 3)
+        {
+            var topPerformingOfProven = provedThemSelves.OrderBy(p => p.totalDifference).FirstOrDefault();
+            if (topPerformingOfProven != null)
+                title.text = GetAreaAndLevelName(topPerformingOfProven);
+            CameraGuess.transform.position = topPerformingOfProven.transform.position;
+            CameraGuess.transform.rotation = topPerformingOfProven.transform.rotation;
+        }
+
     }
     public void UpdateCameraVerticalOffset()
     {
@@ -259,7 +268,7 @@ public class FilterTwin : MonoBehaviour
             var areaItemTypeCounts = area.SemanticsInArea.GroupBy(item => item.type)
                 .ToDictionary(group => group.Key, group => group.Count());
 
-            // Check if the current area matches the camera's view
+            //check for camera matching area
             bool isMatch = cameraItemTypeCounts.All(cameraItemType =>
                 areaItemTypeCounts.TryGetValue(cameraItemType.Key, out var countInArea) && countInArea >= cameraItemType.Value);
 
@@ -273,10 +282,6 @@ public class FilterTwin : MonoBehaviour
     {
         List<ParticleScript> particlesToRemove = new List<ParticleScript>();
 
-        // foreach (var particle in particles)
-        // {
-        //     particle.averageDifferenceSinceCull /= (float)CullFrameTrigger;
-        // }
         if (cameraItemsCopy.Count > 0)
         {
             foreach (var particle in particles)
@@ -299,7 +304,7 @@ public class FilterTwin : MonoBehaviour
                 bool allmatch = true;
                 foreach (var item in particle.conecast.SemanticGazeList)
                 {
-                    // Determine if the current item's type matches the occurrences in the camera's list
+                    //current items type matches the ones in cameras list
                     bool isMatch = cameraItemCount.TryGetValue(item.type, out int cameraCount) &&
                                    conecastItemCount.TryGetValue(item.type, out int conecastCount) &&
                                    cameraCount == conecastCount;
@@ -393,13 +398,11 @@ public class FilterTwin : MonoBehaviour
                 {
                     var lookPosition = semanticsInArea[Random.Range(0, semanticsInArea.Count)].transform.position;
                     Vector3 directionToLook = (lookPosition - particle.transform.position).normalized;
+
                     // Create a rotation that looks at lookPosition
                     Quaternion lookRotation = Quaternion.LookRotation(directionToLook);
 
-                    // Extract the Y component of this rotation
                     float yRotation = lookRotation.eulerAngles.y + Random.Range(-15f, 15f);
-
-                    // Combine Camera's X and Z with the Y component from lookRotation
                     randomRotation = Quaternion.Euler(Camera.main.transform.eulerAngles.x, yRotation, Camera.main.transform.eulerAngles.z);
                 }
 
